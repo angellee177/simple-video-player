@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Video in Canvas with Background Music</title>
+  <style>
+    canvas {
+      display: block;
+      margin: 20px auto;
+      border: 1px solid #000;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="videoCanvas" width="1280" height="720"></canvas>
+  <script>
+    const scenes = [
+      {
+        index: 0,
+        sentence: "This is a simple Javascript test",
+        textPosition: "middle-center",
+        textAnimation: "typing",
+        media: "https://miro.medium.com/max/1024/1*OK8xc3Ic6EGYg2k6BeGabg.jpeg",
+        duration: 3, // Scene 0 duration
+      },
+      {
+        index: 1,
+        sentence: "Here comes the video!",
+        textPosition: "top-right",
+        textAnimation: "blink",
+        media: "https://www.w3schools.com/html/movie.mp4", // Publicly available example video
+        duration: 0, // Scene 1 will be driven by video duration
+      },
+    ];
+
+    const canvas = document.getElementById("videoCanvas");
+    const ctx = canvas.getContext("2d");
+
+    let isPlaying = false;
+    let currentSceneIndex = 0;
+    let startTime = null;
+    let videoPaused = true;
+
+    // Video element for scene 1
+    const video = document.createElement("video");
+    video.src = scenes[1].media;
+    video.crossOrigin = "anonymous";
+    video.muted = true; // Adjust as needed
+    video.load();  // Load the video
+
+    // Load the image for scene 0
+    const image = new Image();
+    image.src = scenes[0].media;
+
+    // Background music element
+    const music = new Audio('https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3'); // Replace with your own music file
+    music.loop = true; // Loop the music
+
+    // This function starts the canvas and video rendering
+    const playCanvas = () => {
+      isPlaying = true;
+      startTime = Date.now();
+      currentSceneIndex = 0;
+      videoPaused = false;
+      video.currentTime = 0;  // Reset video
+      video.play();  // Start the video from the beginning if it's Scene 1
+      music.play();  // Start playing music
+      renderScene();
+    };
+
+    // This function pauses the video and canvas
+    const pauseCanvas = () => {
+      isPlaying = false;
+      videoPaused = true;
+      video.pause();
+      music.pause(); // Pause the music
+    };
+
+    // This function stops the video and resets the canvas
+    const stopCanvas = () => {
+      isPlaying = false;
+      videoPaused = true;
+      video.pause();
+      video.currentTime = 0;
+      startTime = null;
+      currentSceneIndex = 0; // Reset to the first scene
+      music.pause(); // Stop the music
+      music.currentTime = 0; // Reset music to the beginning
+      renderScene(); // Restart the canvas
+    };
+
+    // Render the text in each scene with animation
+    const renderText = (text, position, animation, elapsedTime) => {
+      ctx.fillStyle = "white";
+      ctx.font = "36px Arial";
+      ctx.textAlign = "center";
+
+      const canvasWidth = canvas.width;
+      const canvasHeight = canvas.height;
+      let x = canvasWidth / 2;
+      let y = canvasHeight / 2;
+
+      if (position === "top-right") {
+        x = canvasWidth - 20;
+        y = 40;
+        ctx.textAlign = "right";
+      } else if (position === "middle-center") {
+        ctx.textAlign = "center";
+      }
+
+      if (animation === "typing") {
+        const visibleLength = Math.min(
+          text.length,
+          Math.floor((elapsedTime / 3000) * text.length)
+        );
+        ctx.fillText(text.substring(0, visibleLength), x, y);
+      } else if (animation === "blink") {
+        if (Math.floor(elapsedTime / 500) % 2 === 0) {
+          ctx.fillText(text, x, y);
+        }
+      }
+    };
+
+    // Render each scene
+    const renderScene = () => {
+      if (!isPlaying) return;
+
+      const elapsedTime = Date.now() - startTime;
+      const currentScene = scenes[currentSceneIndex];
+      const sceneElapsedTime = elapsedTime % (currentScene.duration * 1000);
+
+      // Clear canvas for every render
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Scene 0: Show image
+      if (currentScene.index === 0) {
+        ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+      }
+
+      // Scene 1: Show video
+      else if (currentScene.index === 1) {
+        if (!video.paused && !video.ended) {
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        }
+
+        if (video.currentTime >= 0) {
+          // Wait until the video has loaded its metadata (duration) before starting
+          if (video.duration > 0) {
+            scenes[1].duration = video.duration; // Set the duration of scene 1 as the video duration
+          }
+        }
+      }
+
+      // Render text with animations
+      renderText(
+        currentScene.sentence,
+        currentScene.textPosition,
+        currentScene.textAnimation,
+        sceneElapsedTime
+      );
+
+      // Check if scene time has passed
+      if (elapsedTime > scenes[currentSceneIndex].duration * 1000) {
+        if (currentSceneIndex < scenes.length - 1) {
+          currentSceneIndex++;
+          startTime = Date.now();
+          if (currentSceneIndex === 1) {
+            video.currentTime = 0;  // Reset video to start
+            video.play();
+          }
+        } else {
+          isPlaying = false; // End the video
+          music.pause(); // Stop the music when everything ends
+        }
+      }
+
+      // Continue rendering frames
+      if (isPlaying) requestAnimationFrame(renderScene);
+    };
+
+    // Event listeners
+    canvas.addEventListener("click", () => {
+      if (isPlaying) {
+        if (videoPaused) {
+          playCanvas(); // Play video if paused
+        } else {
+          pauseCanvas(); // Pause video if playing
+        }
+      } else {
+        stopCanvas(); // Stop and reset the video if it's already stopped
+      }
+    });
+
+    // Initial message
+    ctx.fillStyle = "black";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = "white";
+    ctx.font = "24px Arial";
+    ctx.textAlign = "center";
+    ctx.fillText("Click to play", canvas.width / 2, canvas.height / 2);
+
+    // Start the canvas render when assets are loaded
+    image.onload = () => {
+      playCanvas();
+    };
+
+    // Wait for video to load metadata (including duration) before playback
+    video.onloadedmetadata = () => {
+      video.currentTime = 0;
+    };
+  </script>
+</body>
+</html>
